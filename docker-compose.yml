@@ -1,0 +1,73 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mundialeros_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mundialeros}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mundialeros}
+      POSTGRES_DB: ${POSTGRES_DB:-mundialeros}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mundialeros} -d ${POSTGRES_DB:-mundialeros}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mundialeros_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-mundialeros}:${POSTGRES_PASSWORD:-mundialeros}@postgres:5432/${POSTGRES_DB:-mundialeros}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-super_secret_change_me_in_production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      PORT: 4000
+      FOOTBALL_PROVIDER: ${FOOTBALL_PROVIDER:-openfootball}
+      FOOTBALL_API_URL: ${FOOTBALL_API_URL:-}
+      FOOTBALL_API_KEY: ${FOOTBALL_API_KEY:-}
+      RESULTS_POLL_CRON: ${RESULTS_POLL_CRON:-*/5 * * * *}
+      ENABLE_ADMIN_RESULTS: ${ENABLE_ADMIN_RESULTS:-false}
+      # Email (opcional): si SMTP_HOST está vacío, los mails se loguean (modo dev)
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      MAIL_ETHEREAL: ${MAIL_ETHEREAL:-true}
+      MAIL_FROM: ${MAIL_FROM:-El Prode de la Gambeta <no-reply@prodelagambeta.app>}
+      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-120}
+      THROTTLE_TTL: ${THROTTLE_TTL:-60000}
+      AUTH_REGISTER_LIMIT: ${AUTH_REGISTER_LIMIT:-5}
+      AUTH_LOGIN_LIMIT: ${AUTH_LOGIN_LIMIT:-10}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+    ports:
+      - "${BACKEND_PORT:-4000}:4000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+    container_name: mundialeros_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+
+volumes:
+  postgres_data:
+    driver: local
