@@ -1,0 +1,291 @@
+// ─────────────────────────────────────────────────────────────
+// El Prode de la Gambeta — Prisma schema
+// Prode del Mundial 2026
+// ─────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Tournament structure ────────────────────────────────────
+
+model Tournament {
+  id        String   @id @default(cuid())
+  name      String
+  season    Int
+  externalId String? @unique // id used by the football data provider
+  startDate DateTime?
+  endDate   DateTime?
+  // Fases ya anunciadas por email (para no reenviar el aviso).
+  notifiedPhases StageType[] @default([])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  teams   Team[]
+  matches Match[]
+  groups  TeamGroup[]
+
+  @@unique([name, season])
+}
+
+enum StageType {
+  GROUP
+  ROUND_OF_32
+  ROUND_OF_16
+  QUARTER_FINAL
+  SEMI_FINAL
+  THIRD_PLACE
+  FINAL
+}
+
+model Stage {
+  id        String    @id @default(cuid())
+  type      StageType
+  name      String
+  order     Int // display / chronological order
+  createdAt DateTime  @default(now())
+
+  matches Match[]
+
+  @@unique([type])
+}
+
+// A FIFA group (A, B, C ...) — distinct from a friends' Group
+model TeamGroup {
+  id           String     @id @default(cuid())
+  name         String // "A", "B", ...
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  teams   Team[]
+  matches Match[]
+
+  @@unique([tournamentId, name])
+}
+
+model Team {
+  id           String     @id @default(cuid())
+  name         String
+  code         String // 3-letter code, e.g. ARG
+  flag         String? // emoji or url
+  externalId   String?
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  teamGroupId  String?
+  teamGroup    TeamGroup? @relation(fields: [teamGroupId], references: [id])
+
+  homeMatches Match[] @relation("HomeTeam")
+  awayMatches Match[] @relation("AwayTeam")
+  championOf  Prediction[] @relation("ChampionPick")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tournamentId, code])
+}
+
+enum MatchStatus {
+  SCHEDULED
+  LIVE
+  FINISHED
+  POSTPONED
+  CANCELLED
+}
+
+model Match {
+  id           String      @id @default(cuid())
+  externalId   String?     @unique
+  tournamentId String
+  tournament   Tournament  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  stageId      String
+  stage        Stage       @relation(fields: [stageId], references: [id])
+  teamGroupId  String?
+  teamGroup    TeamGroup?  @relation(fields: [teamGroupId], references: [id])
+
+  homeTeamId String?
+  homeTeam   Team?   @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeamId String?
+  awayTeam   Team?   @relation("AwayTeam", fields: [awayTeamId], references: [id])
+
+  // Placeholder labels for knockout matches before teams are known ("Winner Group A")
+  homeLabel String?
+  awayLabel String?
+
+  kickoff   DateTime
+  status    MatchStatus @default(SCHEDULED)
+  homeScore Int?
+  awayScore Int?
+  matchday  Int? // group-stage round number
+  matchNumber Int? // official FIFA match number (1-104); knockout uses 73-104
+  homeSlot  String? // knockout slot code (e.g. "1A", "2B", "3A/B/C/D/F", "W73")
+  awaySlot  String?
+  venue     String? // stadium name
+  city      String? // host city
+
+  predictions PredictionMatch[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([kickoff])
+}
+
+// ─── Users & auth ────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ownedGroups      Group[]          @relation("GroupOwner")
+  memberships      GroupMember[]
+  prediction       Prediction?
+  standings        Standing[]
+  scoreHistory     ScoreHistory[]
+  sentInvitations  Invitation[]     @relation("InvitedBy")
+}
+
+// ─── Friends' groups ─────────────────────────────────────────
+
+model Group {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  inviteCode  String   @unique
+  ownerId     String
+  owner       User     @relation("GroupOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     GroupMember[]
+  invitations Invitation[]
+  standings   Standing[]
+}
+
+enum GroupRole {
+  OWNER
+  MEMBER
+}
+
+model GroupMember {
+  id       String    @id @default(cuid())
+  groupId  String
+  group    Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     GroupRole @default(MEMBER)
+  joinedAt DateTime  @default(now())
+
+  @@unique([groupId, userId])
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+model Invitation {
+  id          String           @id @default(cuid())
+  groupId     String
+  group       Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  email       String
+  token       String           @unique
+  status      InvitationStatus @default(PENDING)
+  invitedById String
+  invitedBy   User             @relation("InvitedBy", fields: [invitedById], references: [id])
+  createdAt   DateTime         @default(now())
+  expiresAt   DateTime
+
+  @@index([email])
+}
+
+// ─── Predictions ─────────────────────────────────────────────
+
+model Prediction {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  championTeamId String?
+  championTeam   Team?    @relation("ChampionPick", fields: [championTeamId], references: [id])
+  locked         Boolean  @default(false)
+  lockedAt       DateTime?
+  // Fases ya firmadas por el usuario (GROUP, ROUND_OF_32, ... FINAL).
+  lockedPhases   StageType[] @default([])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  matches PredictionMatch[]
+}
+
+model PredictionMatch {
+  id           String     @id @default(cuid())
+  predictionId String
+  prediction   Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+  matchId      String
+  match        Match      @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  homeScore    Int
+  awayScore    Int
+  // points earned for THIS match prediction (recomputed on result update)
+  pointsAwarded Int       @default(0)
+  isExact       Boolean   @default(false)
+  isOutcome     Boolean   @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([predictionId, matchId])
+}
+
+// ─── Rankings & scoring ──────────────────────────────────────
+
+// Aggregated standing of a user within a group (the leaderboard row).
+model Standing {
+  id            String   @id @default(cuid())
+  groupId       String
+  group         Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  points        Int      @default(0)
+  exactHits     Int      @default(0)
+  outcomeHits   Int      @default(0)
+  championHit   Boolean  @default(false)
+  rank          Int      @default(0)
+  updatedAt     DateTime @updatedAt
+
+  @@unique([groupId, userId])
+  @@index([groupId, points])
+}
+
+enum ScoreReason {
+  EXACT_RESULT
+  CORRECT_OUTCOME
+  CHAMPION
+  ADJUSTMENT
+}
+
+// Audit log of every point change — powers per-matchday ranking & history.
+model ScoreHistory {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  matchId   String?
+  reason    ScoreReason
+  points    Int
+  matchday  Int?
+  stageType StageType?
+  createdAt DateTime    @default(now())
+
+  @@index([userId])
+  @@index([matchId])
+}
