@@ -1,0 +1,222 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ── Celeste y Blanco (modo claro, día de cancha) ── */
+    --background: 205 45% 97%;
+    --foreground: 215 35% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 35% 12%;
+    /* Celeste AFA */
+    --primary: 202 90% 42%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 205 42% 92%;
+    --secondary-foreground: 213 35% 18%;
+    --muted: 205 35% 92%;
+    --muted-foreground: 213 14% 42%;
+    /* Sol de Mayo (dorado) */
+    --accent: 41 95% 50%;
+    --accent-foreground: 28 60% 14%;
+    --destructive: 0 75% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 205 30% 85%;
+    --input: 205 30% 85%;
+    --ring: 202 90% 42%;
+    /* Césped */
+    --pitch: 142 52% 32%;
+    --pitch-foreground: 0 0% 100%;
+    --radius: 0.7rem;
+  }
+
+  .dark {
+    /* ── Noche de cancha (modo oscuro, partido bajo las luces) ── */
+    --background: 217 45% 7%;
+    --foreground: 205 30% 96%;
+    --card: 217 38% 11%;
+    --card-foreground: 205 30% 96%;
+    /* Celeste que brilla bajo los reflectores */
+    --primary: 199 92% 56%;
+    --primary-foreground: 217 45% 7%;
+    --secondary: 217 30% 17%;
+    --secondary-foreground: 205 30% 96%;
+    --muted: 217 28% 16%;
+    --muted-foreground: 210 16% 66%;
+    /* Sol de Mayo */
+    --accent: 43 96% 56%;
+    --accent-foreground: 28 70% 12%;
+    --destructive: 0 74% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 216 28% 20%;
+    --input: 216 28% 22%;
+    --ring: 199 92% 56%;
+    --pitch: 142 48% 38%;
+    --pitch-foreground: 0 0% 100%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'ss01' 1, 'cv01' 1;
+  }
+
+  /* Display headings: Oswald, peso 600 por defecto (legible y parejo) */
+  h1,
+  h2,
+  .font-display {
+    letter-spacing: 0.01em;
+    font-weight: 600;
+  }
+}
+
+@layer utilities {
+  /* ── Cancha: césped con franjas + líneas de cal ── */
+  .cancha {
+    background-color: hsl(var(--pitch));
+    background-image:
+      linear-gradient(
+        90deg,
+        hsl(var(--pitch) / 0.55) 0 8%,
+        hsl(var(--pitch) / 0.78) 8% 16%
+      );
+    background-size: 12.5% 100%;
+  }
+
+  /* Fondo de cancha sutil para secciones (líneas de cal sobre verde apagado) */
+  .cancha-bg {
+    position: relative;
+    background-color: hsl(var(--background));
+    background-image:
+      radial-gradient(
+        circle at 50% -10%,
+        hsl(var(--primary) / 0.16),
+        transparent 55%
+      ),
+      radial-gradient(
+        circle at 90% 10%,
+        hsl(var(--accent) / 0.1),
+        transparent 45%
+      ),
+      repeating-linear-gradient(
+        0deg,
+        hsl(var(--pitch) / 0.045) 0 2px,
+        transparent 2px 88px
+      );
+  }
+
+  /* Líneas de cal: círculo central + raya */
+  .chalk-lines::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      radial-gradient(
+        circle at 50% 50%,
+        transparent 118px,
+        hsl(var(--foreground) / 0.06) 119px 121px,
+        transparent 122px
+      ),
+      linear-gradient(
+        90deg,
+        transparent calc(50% - 1px),
+        hsl(var(--foreground) / 0.06) calc(50% - 1px) calc(50% + 1px),
+        transparent calc(50% + 1px)
+      );
+  }
+
+  /* Texto celeste → dorado (bandera + sol) */
+  .text-celeste {
+    @apply bg-gradient-to-br from-primary via-primary to-accent bg-clip-text text-transparent;
+  }
+  .text-gradient {
+    @apply bg-gradient-to-br from-primary via-primary to-accent bg-clip-text text-transparent;
+  }
+
+  /* Marcador estilo LED / pizarra de cancha */
+  .scoreboard {
+    @apply inline-flex items-center gap-2 rounded-md bg-foreground px-3 py-1 font-display tabular-nums text-background;
+    box-shadow: inset 0 0 0 2px hsl(var(--accent) / 0.6);
+  }
+
+  .glass {
+    @apply border border-border/60 bg-card/75 backdrop-blur-xl;
+  }
+
+  /* Banda tricolor inferior (celeste/blanco/celeste) tipo escudo */
+  .banda-afa {
+    background: linear-gradient(
+      180deg,
+      hsl(var(--primary)) 0 38%,
+      #ffffff 38% 62%,
+      hsl(var(--primary)) 62% 100%
+    );
+  }
+
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+  .shimmer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--foreground) / 0.06),
+      transparent
+    );
+    animation: shimmer 1.5s infinite;
+  }
+
+  /* Papelito de tribuna (confeti que cae) */
+  .papel {
+    position: absolute;
+    top: -10%;
+    width: 10px;
+    height: 14px;
+    opacity: 0.85;
+    animation: papel-fall linear infinite;
+  }
+}
+
+@keyframes papel-fall {
+  0% {
+    transform: translateY(-10vh) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(110vh) rotate(540deg);
+    opacity: 0.9;
+  }
+}
+
+/* Inputs de marcador: ocultar las flechitas para que el número quede centrado */
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary) / 0.35);
+  border-radius: 999px;
+}
