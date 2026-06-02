@@ -177,6 +177,16 @@ function PhaseCard({
   const isGroup = phase.key === 'GROUP';
   const groupNames = groups.map(([g]) => g).sort();
 
+  // Para firmar hay que completar TODOS los partidos de la fase
+  // (y en grupos, además, elegir al campeón).
+  const totalCount = phaseMatchList.length;
+  const needsChampion = isGroup && !champion;
+  const missingParts: string[] = [];
+  if (filledCount < totalCount)
+    missingParts.push(`completá todos los partidos (${filledCount}/${totalCount})`);
+  if (needsChampion) missingParts.push('elegí a tu campeón');
+  const complete = totalCount > 0 && missingParts.length === 0;
+
   return (
     <Card id={anchorId} className={cn('scroll-mt-24', phase.status === 'open' && 'border-accent/50 ring-1 ring-accent/20')}>
       <CardHeader className="flex-row items-center justify-between">
@@ -233,14 +243,21 @@ function PhaseCard({
 
             {/* Acciones de la fase */}
             {phase.editable && (
-              <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:gap-3">
-                <Button variant="outline" className="w-full sm:flex-1" disabled={saving} onClick={onSave}>
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar borrador
-                </Button>
-                <Button variant="accent" className="w-full whitespace-normal sm:flex-1" disabled={confirming || filledCount === 0} onClick={onConfirm}>
-                  {confirming ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Lock className="h-4 w-4 shrink-0" />} Firmar {phase.label}
-                </Button>
-              </div>
+              <>
+                <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:gap-3">
+                  <Button variant="outline" className="w-full sm:flex-1" disabled={saving} onClick={onSave}>
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar borrador
+                  </Button>
+                  <Button variant="accent" className="w-full whitespace-normal sm:flex-1" disabled={confirming || !complete} onClick={onConfirm}>
+                    {confirming ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Lock className="h-4 w-4 shrink-0" />} Firmar {phase.label}
+                  </Button>
+                </div>
+                {!complete && (
+                  <p className="pt-1 text-center text-xs font-semibold text-muted-foreground">
+                    Para poder firmar: {missingParts.join(' y ')}.
+                  </p>
+                )}
+              </>
             )}
           </>
         )}
