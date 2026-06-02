@@ -99,18 +99,18 @@ export default function LandingPage() {
           </div>
 
           {/* Marcador / números grandes */}
-          <div className="mt-14 grid w-full max-w-3xl grid-cols-3 gap-4">
+          <div className="mt-12 grid w-full max-w-3xl grid-cols-3 gap-2 sm:gap-4">
             {[
               { k: '48', v: 'Selecciones' },
               { k: '104', v: 'Partidos' },
-              { k: '★★★', v: 'Las que ya tenemos' },
+              { k: '★★★', v: 'Estrellas' },
             ].map((s, i) => (
               <Card key={s.v} className="animate-pop-in glass" style={{ animationDelay: `${i * 80}ms` }}>
-                <CardContent className="p-5 text-center">
-                  <div className="font-display text-3xl text-celeste md:text-4xl">
+                <CardContent className="px-2 py-4 text-center sm:p-5">
+                  <div className="font-display text-2xl leading-none text-celeste sm:text-3xl md:text-4xl">
                     {s.k}
                   </div>
-                  <div className="mt-1 text-xs uppercase tracking-wide text-muted-foreground md:text-sm">
+                  <div className="mt-1.5 text-[10px] uppercase leading-tight tracking-wide text-muted-foreground sm:text-xs md:text-sm">
                     {s.v}
                   </div>
                 </CardContent>
