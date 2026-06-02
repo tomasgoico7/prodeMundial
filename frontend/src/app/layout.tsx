@@ -27,7 +27,7 @@ const DESCRIPTION =
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
   title: {
-    default: 'El Prode de la Gambeta — Prode del Mundial 2026',
+    default: 'El Prode de la Gambeta',
     template: '%s · El Prode de la Gambeta',
   },
   description: DESCRIPTION,
