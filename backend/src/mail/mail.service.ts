@@ -14,11 +14,16 @@ export class MailService implements OnModuleInit {
   private transporter: nodemailer.Transporter | null = null;
   private ethereal = false;
   private from = 'El Prode de la Gambeta <no-reply@prodelagambeta.app>';
+  // URL pública del frontend, para los links de los mails. En prod: la de Vercel.
+  private appUrl = 'http://localhost:3100';
 
   constructor(private readonly config: ConfigService) {}
 
   async onModuleInit(): Promise<void> {
     this.from = this.config.get<string>('MAIL_FROM', this.from);
+    this.appUrl = this.config
+      .get<string>('APP_URL', this.appUrl)
+      .replace(/\/$/, '');
     const host = this.config.get<string>('SMTP_HOST');
 
     if (host) {
@@ -86,14 +91,14 @@ export class MailService implements OnModuleInit {
     const text =
       `¡Hola ${name}!\n\nYa se habilitó la fase "${phaseLabel}" del Mundial 2026 en tu prode. ` +
       `Entrá a completarla y firmarla antes de que arranquen los partidos.\n\n` +
-      `👉 http://localhost:3100/predictions\n\n¡Aguante, crack! 🇦🇷`;
+      `👉 ${this.appUrl}/predictions\n\n¡Aguante, crack! 🇦🇷`;
     const html =
       `<div style="font-family:system-ui,sans-serif;max-width:520px">` +
       `<h2 style="color:#0ea5e9">⚽ El Prode de la Gambeta</h2>` +
       `<p>¡Hola <strong>${name}</strong>!</p>` +
       `<p>Ya se habilitó la fase <strong>"${phaseLabel}"</strong> del Mundial 2026 en tu prode.</p>` +
       `<p>Entrá a completarla y firmarla <strong>antes de que arranquen los partidos</strong>.</p>` +
-      `<p><a href="http://localhost:3100/predictions" style="background:#0ea5e9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold">Completar mi prode</a></p>` +
+      `<p><a href="${this.appUrl}/predictions" style="background:#0ea5e9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold">Completar mi prode</a></p>` +
       `<p style="color:#666">¡Aguante, crack! 🇦🇷</p></div>`;
     await this.send(to, subject, text, html);
   }
@@ -109,7 +114,7 @@ export class MailService implements OnModuleInit {
     const text =
       `¡Hola!\n\n${inviterName} te invitó a su grupo "${groupName}" para el Prode del Mundial 2026.\n\n` +
       `Código para unirte: ${inviteCode}\n\n` +
-      `1) Entrá a http://localhost:3100/register y creá tu cuenta (o ingresá si ya tenés).\n` +
+      `1) Entrá a ${this.appUrl}/register y creá tu cuenta (o ingresá si ya tenés).\n` +
       `2) En "La Barra" tocá "Sumarme" y pegá el código ${inviteCode}.\n\n` +
       `¡Te esperamos, crack! 🇦🇷`;
     const html =
@@ -119,7 +124,7 @@ export class MailService implements OnModuleInit {
       `<p>Tu código para unirte:</p>` +
       `<p style="font-size:28px;font-weight:bold;letter-spacing:4px;background:#f1f5f9;padding:12px 18px;border-radius:10px;display:inline-block;color:#0b1220">${inviteCode}</p>` +
       `<p>1) Creá tu cuenta o ingresá. &nbsp; 2) En <strong>La Barra → Sumarme</strong>, pegá el código.</p>` +
-      `<p><a href="http://localhost:3100/register" style="background:#0ea5e9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold">Crear cuenta y unirme</a></p>` +
+      `<p><a href="${this.appUrl}/register" style="background:#0ea5e9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold">Crear cuenta y unirme</a></p>` +
       `<p style="color:#666">¡Te esperamos, crack! 🇦🇷</p></div>`;
     await this.send(to, subject, text, html);
   }

@@ -45,6 +45,8 @@ services:
       SMTP_SECURE: ${SMTP_SECURE:-false}
       MAIL_ETHEREAL: ${MAIL_ETHEREAL:-true}
       MAIL_FROM: ${MAIL_FROM:-El Prode de la Gambeta <no-reply@prodelagambeta.app>}
+      # URL pública del frontend (links de los mails). En prod: la URL de Vercel.
+      APP_URL: ${APP_URL:-http://localhost:3100}
       THROTTLE_LIMIT: ${THROTTLE_LIMIT:-120}
       THROTTLE_TTL: ${THROTTLE_TTL:-60000}
       AUTH_REGISTER_LIMIT: ${AUTH_REGISTER_LIMIT:-5}
