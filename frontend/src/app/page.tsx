@@ -70,9 +70,12 @@ export default function LandingPage() {
       <main className="container relative z-10">
         {/* Hero */}
         <section className="flex flex-col items-center py-16 text-center md:py-24">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-card/70 px-4 py-1.5 text-xs font-bold uppercase tracking-wide backdrop-blur">
-            <span className="text-sol">★★★</span>
-            Mundial FIFA 2026 · 48 selecciones · 104 partidos
+          <div className="mb-6 inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-border bg-card/70 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wide backdrop-blur sm:text-xs">
+            <span className="shrink-0 text-sol">★★★</span>
+            <span className="sm:hidden">Mundial FIFA 2026</span>
+            <span className="hidden sm:inline">
+              Mundial FIFA 2026 · 48 selecciones · 104 partidos
+            </span>
           </div>
 
           <h1 className="max-w-4xl font-display text-5xl uppercase leading-[0.92] tracking-tight md:text-8xl">
