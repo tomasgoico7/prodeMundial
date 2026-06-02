@@ -18,19 +18,51 @@ const sans = Archivo({
   display: 'swap',
 });
 
+const SITE =
+  process.env.NEXT_PUBLIC_SITE_URL ?? 'https://elprodedelagambeta.vercel.app';
+
+const DESCRIPTION =
+  'El Prode del Mundial FIFA 2026, bien de cancha. Armá tu barra, cargá la planilla, bancá a la Scaloneta y peleá la punta de la tabla con tus amigos. Gratis y en tiempo real.';
+
 export const metadata: Metadata = {
-  title: 'El Prode de la Gambeta',
-  description:
-    'El Prode de la Gambeta: el Prode del Mundial FIFA 2026, bien de cancha. Armá tu barra, cargá la planilla, bancá a la Scaloneta y peleá la punta de la tabla con tus amigos.',
+  metadataBase: new URL(SITE),
+  title: {
+    default: 'El Prode de la Gambeta — Prode del Mundial 2026',
+    template: '%s · El Prode de la Gambeta',
+  },
+  description: DESCRIPTION,
+  applicationName: 'El Prode de la Gambeta',
   keywords: [
     'prode',
+    'prode mundial 2026',
     'mundial 2026',
-    'fifa',
+    'fifa 2026',
     'fútbol argentino',
     'scaloneta',
-    'planilla',
-    'predicciones',
+    'planilla del mundial',
+    'predicciones fútbol',
+    'pozo entre amigos',
   ],
+  authors: [{ name: 'El Prode de la Gambeta' }],
+  alternates: { canonical: '/' },
+  openGraph: {
+    type: 'website',
+    locale: 'es_AR',
+    url: SITE,
+    siteName: 'El Prode de la Gambeta',
+    title: 'El Prode de la Gambeta — Prode del Mundial 2026',
+    description: DESCRIPTION,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'El Prode de la Gambeta — Prode del Mundial 2026',
+    description: DESCRIPTION,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true },
+  },
 };
 
 export const viewport: Viewport = {
