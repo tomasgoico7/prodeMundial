@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { StageType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PUBLIC_USER_SELECT, PublicUser } from '../users/users.types';
+import { phaseKeyForStage } from '../predictions/phases';
 
 export interface LeaderEntry {
   user: PublicUser;
@@ -21,7 +23,10 @@ export class StatsService {
 
     const predictions = await this.prisma.prediction.findMany({
       where: { userId: { in: memberIds } },
-      include: { championTeam: true, matches: true },
+      include: {
+        championTeam: true,
+        matches: { include: { match: { select: { stage: { select: { type: true } } } } } },
+      },
     });
     const predByUser = new Map(predictions.map((p) => [p.userId, p]));
 
@@ -42,10 +47,13 @@ export class StatsService {
       .filter((s) => s.points === maxPoints && maxPoints > 0)
       .map((s) => s.user);
 
-    // Accuracy % per member: (exact + outcome) / matches predicted
+    // Accuracy % per member: (exact + outcome) / partidos FIRMADOS.
+    // Los guardados sin firmar no cuentan (quedan privados para el usuario).
     const accuracy = standings.map((s) => {
       const pred = predByUser.get(s.userId);
-      const predicted = pred?.matches.length ?? 0;
+      const predicted = (pred?.matches ?? []).filter((m) =>
+        pred!.lockedPhases.includes(phaseKeyForStage(m.match.stage.type)),
+      ).length;
       const hits = s.exactHits + s.outcomeHits;
       return {
         user: s.user,
@@ -65,6 +73,8 @@ export class StatsService {
     >();
     for (const p of predictions) {
       if (!p.championTeam) continue;
+      // Solo cuenta el campeón si firmó la fase de grupos (los guardados no).
+      if (!p.lockedPhases.includes(StageType.GROUP)) continue;
       const key = p.championTeam.id;
       const entry =
         championCounts.get(key) ??
