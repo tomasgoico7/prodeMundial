@@ -75,7 +75,9 @@ export default function PredictionsPage() {
 
   function setScore(matchId: string, side: 'home' | 'away', value: string, locked: boolean) {
     if (locked) return;
-    const n = value === '' ? '' : Math.max(0, Math.min(20, Number(value)));
+    // Solo dígitos (bloquea e, -, ., ,), máximo 2 y clamp 0–20.
+    const digits = value.replace(/\D/g, '').slice(0, 2);
+    const n = digits === '' ? '' : Math.min(20, Number(digits));
     setScores((prev) => ({ ...prev, [matchId]: { home: prev[matchId]?.home ?? '', away: prev[matchId]?.away ?? '', [side]: n } }));
   }
 
@@ -316,13 +318,11 @@ function PredictionInput({
   const inputCls =
     'h-14 w-14 shrink-0 rounded-xl border-2 border-input bg-background text-center font-display text-2xl font-bold focus:border-primary focus:outline-none disabled:opacity-60';
   const homeInput = (
-    <input type="number" min={0} max={20} inputMode="numeric" disabled={locked} value={home}
-      onWheel={(e) => e.currentTarget.blur()}
+    <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2} disabled={locked} value={home}
       onChange={(e) => onChange(match.id, 'home', e.target.value)} className={inputCls} />
   );
   const awayInput = (
-    <input type="number" min={0} max={20} inputMode="numeric" disabled={locked} value={away}
-      onWheel={(e) => e.currentTarget.blur()}
+    <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2} disabled={locked} value={away}
       onChange={(e) => onChange(match.id, 'away', e.target.value)} className={inputCls} />
   );
 
