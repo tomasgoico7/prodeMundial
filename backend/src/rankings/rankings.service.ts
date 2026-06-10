@@ -92,9 +92,13 @@ export class RankingsService {
     }
     const preds = await this.prisma.prediction.findMany({
       where: { userId: { in: userIds } },
-      select: { userId: true, championTeamId: true },
+      select: { userId: true, championTeamId: true, lockedPhases: true },
     });
     const champByUser = new Map(preds.map((p) => [p.userId, p.championTeamId]));
+    // El campeón solo cuenta si el usuario firmó la fase de grupos.
+    const groupSigned = new Set(
+      preds.filter((p) => p.lockedPhases.includes(StageType.GROUP)).map((p) => p.userId),
+    );
 
     const rankRows = <T extends { points: number; exactHits: number }>(
       rows: T[],
@@ -123,7 +127,9 @@ export class RankingsService {
 
     const champRows = members.map((m) => {
       const hit =
-        !!championTeamId && champByUser.get(m.userId) === championTeamId;
+        !!championTeamId &&
+        champByUser.get(m.userId) === championTeamId &&
+        groupSigned.has(m.userId);
       return { user: m.user, points: hit ? SCORING.CHAMPION : 0, exactHits: 0 };
     });
     phases.push({

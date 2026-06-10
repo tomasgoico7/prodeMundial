@@ -25,6 +25,16 @@ export const PHASES: PhaseDef[] = [
   { key: 'FINAL', label: 'Final y tercer puesto', stages: [StageType.THIRD_PLACE, StageType.FINAL], prev: 'SEMI_FINAL' },
 ];
 
+/**
+ * Devuelve la KEY de fase (la que se guarda en lockedPhases) a la que pertenece
+ * una etapa. Ej: THIRD_PLACE y FINAL → 'FINAL'. Sirve para saber si el partido
+ * pertenece a una fase que el usuario firmó.
+ */
+export function phaseKeyForStage(stage: StageType): StageType {
+  const phase = PHASES.find((p) => p.stages.includes(stage));
+  return (phase?.key ?? stage) as StageType;
+}
+
 export interface StageInfo {
   total: number;
   finished: number;

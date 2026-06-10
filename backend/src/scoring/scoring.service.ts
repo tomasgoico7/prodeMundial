@@ -5,6 +5,7 @@ import {
   SCORING,
   evaluateMatchPrediction,
 } from '../common/constants/scoring.constants';
+import { phaseKeyForStage } from '../predictions/phases';
 
 /**
  * Owns all point calculation. Whenever a result lands, the platform calls
@@ -37,17 +38,23 @@ export class ScoringService {
       return;
     }
 
+    // Solo puntúan las predicciones de una fase que el usuario FIRMÓ.
+    const phaseKey = phaseKeyForStage(match.stage.type);
+
     await this.prisma.$transaction(async (tx) => {
       // wipe prior history for this match so recalculation stays idempotent
       await tx.scoreHistory.deleteMany({ where: { matchId } });
 
       for (const pm of match.predictions) {
-        const { outcome, points } = evaluateMatchPrediction(
-          pm.homeScore,
-          pm.awayScore,
-          match.homeScore!,
-          match.awayScore!,
-        );
+        const signed = pm.prediction.lockedPhases.includes(phaseKey);
+        const { outcome, points } = signed
+          ? evaluateMatchPrediction(
+              pm.homeScore,
+              pm.awayScore,
+              match.homeScore!,
+              match.awayScore!,
+            )
+          : { outcome: 'NONE' as const, points: 0 };
 
         await tx.predictionMatch.update({
           where: { id: pm.id },
@@ -112,8 +119,11 @@ export class ScoringService {
         if (m.isExact) exactHits++;
         else if (m.isOutcome) outcomeHits++;
       }
+      // El campeón solo cuenta si el usuario firmó la fase de grupos.
       const championHit =
-        !!championTeamId && p.championTeamId === championTeamId;
+        !!championTeamId &&
+        p.championTeamId === championTeamId &&
+        p.lockedPhases.includes(StageType.GROUP);
       if (championHit) points += SCORING.CHAMPION;
 
       stats.set(p.userId, { points, exactHits, outcomeHits, championHit });
