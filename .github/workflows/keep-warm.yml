@@ -1,0 +1,35 @@
+# ─────────────────────────────────────────────────────────────
+# Mantiene "despierto" el backend en Render (free tier).
+#
+# Render duerme los servicios del plan gratuito tras ~15 min de inactividad.
+# La primera visita después de dormir se come un "cold start" (lento, y a
+# veces falla con 502). Este workflow pinguea /api/health cada 10 minutos
+# para que el servicio no llegue a dormirse y la app responda rápido.
+#
+# Nota: el frontend está en Vercel (no se duerme), por eso solo pingueamos
+# el backend. Agregá más URLs al array `urls` si sumás servicios.
+# ─────────────────────────────────────────────────────────────
+name: keep-warm
+
+on:
+  schedule:
+    # Cada 10 minutos (en UTC). GitHub puede demorar un poco los cron.
+    - cron: "*/10 * * * *"
+  # Permite ejecutarlo a mano desde la pestaña Actions.
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoints
+        run: |
+          urls=(
+            "https://prodemundial-5n8d.onrender.com/api/health"
+          )
+          for url in "${urls[@]}"; do
+            # --max-time 60: el primer hit puede tardar por el cold start.
+            # "|| code=000": si curl falla, NO tumba el job (sigue de largo).
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "$url") || code="000"
+            echo "$url -> $code"
+          done
