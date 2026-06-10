@@ -16,6 +16,8 @@ import { useTournament, useAllMatches } from '@/features/tournament/use-tourname
 import { Flag } from '@/components/flag';
 import type { Match, Team, PredictionPhase } from '@/lib/types';
 import { cn, formatMatchDay, formatMatchTime } from '@/lib/utils';
+import { useAuthStore } from '@/store/auth-store';
+import { downloadPlanillaPdf } from '@/lib/planilla-pdf';
 
 type ScoreMap = Record<string, { home: number | ''; away: number | '' }>;
 
@@ -38,6 +40,7 @@ export default function PredictionsPage() {
   const { data: allMatches, isLoading: loadingMatches } = useAllMatches();
   const savePhase = useSavePhase();
   const confirmPhase = useConfirmPhase();
+  const me = useAuthStore((s) => s.user);
 
   const [scores, setScores] = useState<ScoreMap>({});
   const [champion, setChampion] = useState('');
@@ -142,7 +145,39 @@ export default function PredictionsPage() {
           onSave={() => savePhase.mutate({ phase: phase.key, payload: phasePayload(phase) })}
           onConfirm={() => {
             if (window.confirm(`¿Firmás la fase "${phase.label}"? Queda cerrada y no la podés tocar más.`)) {
-              confirmPhase.mutate({ phase: phase.key, payload: phasePayload(phase) });
+              confirmPhase.mutate(
+                { phase: phase.key, payload: phasePayload(phase) },
+                {
+                  onSuccess: () => {
+                    const ms = phaseMatches(phase).filter(
+                      (m) => scores[m.id] && scores[m.id].home !== '' && scores[m.id].away !== '',
+                    );
+                    if (phase.key === 'GROUP') {
+                      ms.sort(
+                        (a, b) =>
+                          (a.teamGroup?.name ?? '').localeCompare(b.teamGroup?.name ?? '') ||
+                          (a.matchNumber ?? 0) - (b.matchNumber ?? 0),
+                      );
+                    }
+                    void downloadPlanillaPdf({
+                      userName: me ? `${me.firstName} ${me.lastName}` : 'Crack',
+                      phaseKey: phase.key,
+                      phaseLabel: phase.label,
+                      championName:
+                        phase.key === 'GROUP'
+                          ? (allTeams.find((t) => t.id === champion)?.name ?? null)
+                          : null,
+                      rows: ms.map((m) => ({
+                        group: phase.key === 'GROUP' ? (m.teamGroup?.name ?? null) : null,
+                        home: m.homeTeam?.name ?? m.homeLabel ?? 'A definir',
+                        away: m.awayTeam?.name ?? m.awayLabel ?? 'A definir',
+                        homeScore: Number(scores[m.id].home),
+                        awayScore: Number(scores[m.id].away),
+                      })),
+                    });
+                  },
+                },
+              );
             }
           }}
           saving={savePhase.isPending}
