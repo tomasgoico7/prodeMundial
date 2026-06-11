@@ -9,8 +9,14 @@ import {
 const OPENFOOTBALL_2026_URL =
   'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json';
 
+interface OFScore {
+  ft?: [number, number]; // tiempo reglamentario (90')
+  et?: [number, number]; // tras alargue
+  p?: [number, number]; // penales
+}
 interface OFMatch {
-  score1?: number;
+  score?: OFScore; // formato actual de openfootball
+  score1?: number; // formato legacy (compat)
   score2?: number;
 }
 interface OFFile {
@@ -45,12 +51,21 @@ export class OpenFootballProvider implements FootballProvider {
       if (!m.externalId.startsWith('of2026-') || Number.isNaN(idx)) continue;
       const src = data.matches?.[idx];
       if (!src) continue;
-      if (typeof src.score1 === 'number' && typeof src.score2 === 'number') {
+      // Formato actual: score.ft (90') / score.et (alargue). Tomamos el de
+      // alargue si existe (define el ganador en eliminatorias) y si no, el de
+      // los 90'. Compat con el formato viejo score1/score2.
+      const pair: [number, number] | undefined =
+        src.score?.et ??
+        src.score?.ft ??
+        (typeof src.score1 === 'number' && typeof src.score2 === 'number'
+          ? [src.score1, src.score2]
+          : undefined);
+      if (pair && typeof pair[0] === 'number' && typeof pair[1] === 'number') {
         updates.push({
           externalId: m.externalId,
           status: MatchStatus.FINISHED,
-          homeScore: src.score1,
-          awayScore: src.score2,
+          homeScore: pair[0],
+          awayScore: pair[1],
         });
       }
     }
