@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MatchStatus, ScoreReason, StageType } from '@prisma/client';
+import { MatchStatus, Prisma, ScoreReason, StageType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   SCORING,
@@ -18,13 +18,18 @@ export class ScoringService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Re-evaluate every user's prediction for a single finished match.
-   * Writes per-match points back onto PredictionMatch and refreshes the
-   * audit trail (ScoreHistory) used by the per-matchday ranking.
-   */
   async recalculateMatch(matchId: string): Promise<void> {
-    const match = await this.prisma.match.findUnique({
+    await this.prisma.$transaction(
+      (tx) => this.recalculateMatchTx(tx, matchId),
+      { timeout: 30_000 },
+    );
+  }
+
+  async recalculateMatchTx(
+    tx: Prisma.TransactionClient,
+    matchId: string,
+  ): Promise<void> {
+    const match = await tx.match.findUnique({
       where: { id: matchId },
       include: { predictions: { include: { prediction: true } }, stage: true },
     });
@@ -41,51 +46,91 @@ export class ScoringService {
     // Solo puntúan las predicciones de una fase que el usuario FIRMÓ.
     const phaseKey = phaseKeyForStage(match.stage.type);
 
-    await this.prisma.$transaction(async (tx) => {
-      // wipe prior history for this match so recalculation stays idempotent
-      await tx.scoreHistory.deleteMany({ where: { matchId } });
+    // wipe prior history for this match so recalculation stays idempotent
+    await tx.scoreHistory.deleteMany({ where: { matchId } });
 
-      for (const pm of match.predictions) {
+    for (const pm of match.predictions) {
+      const signed = pm.prediction.lockedPhases.includes(phaseKey);
+      const { outcome, points } = signed
+        ? evaluateMatchPrediction(
+            pm.homeScore,
+            pm.awayScore,
+            match.homeScore,
+            match.awayScore,
+          )
+        : { outcome: 'NONE' as const, points: 0 };
+
+      await tx.predictionMatch.update({
+        where: { id: pm.id },
+        data: {
+          pointsAwarded: points,
+          isExact: outcome === 'EXACT',
+          isOutcome: outcome === 'OUTCOME',
+        },
+      });
+
+      if (points > 0) {
+        await tx.scoreHistory.create({
+          data: {
+            userId: pm.prediction.userId,
+            matchId,
+            reason:
+              outcome === 'EXACT'
+                ? ScoreReason.EXACT_RESULT
+                : ScoreReason.CORRECT_OUTCOME,
+            points,
+            matchday: match.matchday,
+            stageType: match.stage.type,
+          },
+        });
+      }
+    }
+
+    this.logger.log(
+      `Recalculated match ${matchId} (${match.predictions.length} predictions)`,
+    );
+  }
+
+  async reconcileFinishedScores(): Promise<number> {
+    const matches = await this.prisma.match.findMany({
+      where: {
+        status: MatchStatus.FINISHED,
+        homeScore: { not: null },
+        awayScore: { not: null },
+      },
+      include: { predictions: { include: { prediction: true } }, stage: true },
+    });
+
+    const stale: string[] = [];
+    for (const m of matches) {
+      const phaseKey = phaseKeyForStage(m.stage.type);
+      const mismatched = m.predictions.some((pm) => {
         const signed = pm.prediction.lockedPhases.includes(phaseKey);
         const { outcome, points } = signed
           ? evaluateMatchPrediction(
               pm.homeScore,
               pm.awayScore,
-              match.homeScore!,
-              match.awayScore!,
+              m.homeScore!,
+              m.awayScore!,
             )
           : { outcome: 'NONE' as const, points: 0 };
+        return (
+          pm.pointsAwarded !== points ||
+          pm.isExact !== (outcome === 'EXACT') ||
+          pm.isOutcome !== (outcome === 'OUTCOME')
+        );
+      });
+      if (mismatched) stale.push(m.id);
+    }
 
-        await tx.predictionMatch.update({
-          where: { id: pm.id },
-          data: {
-            pointsAwarded: points,
-            isExact: outcome === 'EXACT',
-            isOutcome: outcome === 'OUTCOME',
-          },
-        });
+    if (stale.length === 0) return 0;
 
-        if (points > 0) {
-          await tx.scoreHistory.create({
-            data: {
-              userId: pm.prediction.userId,
-              matchId,
-              reason:
-                outcome === 'EXACT'
-                  ? ScoreReason.EXACT_RESULT
-                  : ScoreReason.CORRECT_OUTCOME,
-              points,
-              matchday: match.matchday,
-              stageType: match.stage.type,
-            },
-          });
-        }
-      }
-    });
-
-    this.logger.log(
-      `Recalculated match ${matchId} (${match.predictions.length} predictions)`,
+    for (const id of stale) await this.recalculateMatch(id);
+    await this.rebuildStandings();
+    this.logger.warn(
+      `Reconciled ${stale.length} finished match(es) with stale scores`,
     );
+    return stale.length;
   }
 
   /**

@@ -77,11 +77,16 @@ export class MatchesService {
    * real scoring + ranking recalculation. Gated by ENABLE_ADMIN_RESULTS.
    */
   async setResult(matchId: string, homeScore: number, awayScore: number) {
-    await this.prisma.match.update({
-      where: { id: matchId },
-      data: { status: MatchStatus.FINISHED, homeScore, awayScore },
-    });
-    await this.scoring.recalculateMatch(matchId);
+    await this.prisma.$transaction(
+      async (tx) => {
+        await tx.match.update({
+          where: { id: matchId },
+          data: { status: MatchStatus.FINISHED, homeScore, awayScore },
+        });
+        await this.scoring.recalculateMatchTx(tx, matchId);
+      },
+      { timeout: 30_000 },
+    );
     // Resolver/propagar el cuadro (llena octavos+ con los equipos reales) y
     // recién después recalcular standings (para que el campeón quede resuelto).
     await this.bracket.resolveAndPropagate();
@@ -114,17 +119,31 @@ export class MatchesService {
     let finished = 0;
 
     for (const u of updates) {
-      const match = await this.prisma.match.update({
-        where: { externalId: u.externalId },
-        data: {
-          status: u.status,
-          homeScore: u.homeScore,
-          awayScore: u.awayScore,
-        },
-      });
       if (u.status === MatchStatus.FINISHED) {
+        await this.prisma.$transaction(
+          async (tx) => {
+            const match = await tx.match.update({
+              where: { externalId: u.externalId },
+              data: {
+                status: u.status,
+                homeScore: u.homeScore,
+                awayScore: u.awayScore,
+              },
+            });
+            await this.scoring.recalculateMatchTx(tx, match.id);
+          },
+          { timeout: 30_000 },
+        );
         finished++;
-        await this.scoring.recalculateMatch(match.id);
+      } else {
+        await this.prisma.match.update({
+          where: { externalId: u.externalId },
+          data: {
+            status: u.status,
+            homeScore: u.homeScore,
+            awayScore: u.awayScore,
+          },
+        });
       }
     }
 
@@ -133,6 +152,8 @@ export class MatchesService {
       await this.scoring.rebuildStandings();
       void this.notifications.announceNewlyOpenPhases().catch(() => undefined);
     }
+
+    await this.scoring.reconcileFinishedScores();
 
     if (updates.length) {
       this.logger.log(
